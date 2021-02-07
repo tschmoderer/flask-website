@@ -3,7 +3,10 @@ from flask import Flask, render_template, request, url_for, flash, redirect
 from werkzeug.exceptions import abort
 
 app = Flask(__name__)
-app.config.from_pyfile('config.py')
+try:
+    app.config.from_pyfile('config.py')
+except:
+    app.config.from_pyfile('config.default.py')
 
 def get_db_connection():
     conn = sqlite3.connect('database.db')
@@ -79,3 +82,6 @@ def delete(id):
     conn.close()
     flash('"{}" was successfully deleted!'.format(post['title']))
     return redirect(url_for('index'))
+
+if __name__ == "__main__"
+    app.run(host='0.0.0.0')
