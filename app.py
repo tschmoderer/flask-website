@@ -83,5 +83,5 @@ def delete(id):
     flash('"{}" was successfully deleted!'.format(post['title']))
     return redirect(url_for('index'))
 
-if __name__ == "__main__"
+if __name__ == "__main__":
     app.run(host='0.0.0.0')
