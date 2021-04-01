@@ -355,6 +355,7 @@
 
       mygraph.bind('doubleClickNode', function(e) {
         console.log(e.type, e.data.node.id);
+        add_notification('loading data for ' + e.data.node.label, 'info');
         fetch_data(e.data.node.id);
       });
       // TODO zoom and event and filters and drag and  page with full graph and force atlas parameter
