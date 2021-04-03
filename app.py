@@ -5,6 +5,11 @@ import musicbrainzngs
 from musicdb import *
 import os.path
 import random
+import networkx
+import community
+import matplotlib.colors as mpcolors
+import matplotlib.cm as mpcm
+from fa2 import ForceAtlas2
 
 musicbrainzngs.set_useragent("dbchart", "0.1", "https://github.com/tschmoderer/musicdb/",)
 
@@ -94,6 +99,10 @@ def delete(id):
 def artist_main():
     return render_template('artist/home.html')
 
+@app.route('/artist/full', methods=('GET',))
+def artist_full():
+    return render_template('artist/full.html')
+
 @app.route('/artist/search/<string:query>', methods=('GET',))
 def search_artist(query):
     data = {
@@ -119,6 +128,99 @@ def search_artist(query):
     print(data)
     return jsonify(data)
 
+@app.route('/artist/full/data.json', methods=('GET',))
+def get_full_graph():
+    database   = sqlite3.connect('music-database.db')
+    db_cursor = database.cursor()
+
+    db_cursor.execute("""SELECT artist1Id, artist2Id, count(*) as nb from featuring GROUP by artist1Id, artist2Id;""") # il y a pleins de doublons !!
+    edges = db_cursor.fetchall()
+    # e[0]: src node id, e[1]: dst node id, e[2]: weight int 
+
+    db_cursor.execute("""
+        SELECT ROW_NUMBER () OVER (ORDER BY artist_mbid) id, artist_mbid, name
+        FROM artists""")
+    nodes = db_cursor.fetchall()
+
+    data = {
+        "nodes": [],
+        "edges": []
+    }
+
+    for n in nodes:
+        data["nodes"].append(
+            {'id': str(n[1]),
+            'label': n[2], 
+            'color': "rgb(" + str(random.randint(0, 255)) + "," + str(random.randint(0, 255))+"," +str(random.randint(0, 255))+")",
+            'size': 100, 
+            'x':random.randint(-10, 10),
+            'y':random.randint(-10, 10)
+            })
+    k = 0
+    for e in edges:
+        data["edges"].append(
+        {
+            'id': str(k),
+            'label': str(e[2]) + ' feat(s)',
+            'source': e[0],
+            'target': e[1],
+            'size': e[2]*5,
+        })
+        k += 1
+    
+    G = networkx.Graph()
+    for n in data['nodes']:
+        G.add_node(n['id'], name=n['label'])
+    for e in data['edges']:
+        G.add_edge(e['source'], e['target'])
+    part = community.best_partition(G, randomize=True)
+    part = community.best_partition(G, partition=part)
+
+    modularity = {}
+    for p in part: 
+        modularity[part[p]] = {'name': 'empty', 'id_max_w': 0}
+    
+    for p in part:
+        mod_class = part[p]
+        nd_degree = G.degree(p)
+        if (nd_degree > modularity[mod_class]['id_max_w']):
+            modularity[mod_class]['id_max_w'] = nd_degree
+            modularity[mod_class]['name'] = G.nodes[p]['name']
+
+    cmap = mpcm.get_cmap('tab20c')
+    for n in data['nodes']:
+        n['color'] = mpcolors.rgb2hex(cmap(part[n['id']]))
+        n['attributes'] = {'Modularity Class': modularity[part[n['id']]]['name']}
+        n['size'] = G.degree(n['id'])*10
+    
+    forceatlas2 = ForceAtlas2(
+        # Behavior alternatives
+        outboundAttractionDistribution=True,  # Dissuade hubs
+        linLogMode=False,  # NOT IMPLEMENTED
+        adjustSizes=False,  # Prevent overlap (NOT IMPLEMENTED)
+        edgeWeightInfluence=0, # 0 or 1?
+
+        # Performance
+        jitterTolerance=1.0,  # Tolerance
+        barnesHutOptimize=True,
+        barnesHutTheta=1.2,
+        multiThreaded=False,  # NOT IMPLEMENTED
+
+        # Tuning
+        scalingRatio=2.0,
+        strongGravityMode=False,
+        gravity=1.0,
+
+        # Log
+        verbose=True)
+    positions = forceatlas2.forceatlas2_networkx_layout(G, pos=None, iterations=1000)
+
+    for n in data['nodes']:
+        n['x'] = positions[n['id']][0]
+        n['y'] = positions[n['id']][1]
+
+    database.close()
+    return jsonify(data)
 
 @app.route('/artist/<uuid:artist_id>/data.json', methods=('GET',))
 def generate_artist_data(artist_id):
