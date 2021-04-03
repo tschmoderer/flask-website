@@ -447,15 +447,15 @@
     <script type="text/javascript">
           function startForceAtlas(elem) {
             mygraph.startForceAtlas2({
-              linLogMode: false,
+              inLogMode: false,
               outboundAttractionDistribution: true,
               adjustSizes: true,
               edgeWeightInfluence: 0,
-              scalingRatio: 0.5,
+              scalingRatio: 2.0,
               strongGravityMode: false,
-              gravity: 2,
-              barnesHutOptimize: false,
-              barnesHutTheta: 0.5,
+              gravity: 1,
+              barnesHutOptimize: true,
+              barnesHutTheta: 1.2,
               slowDown: 1,
               startingIterations: 1,
               iterationsPerRender: 1,

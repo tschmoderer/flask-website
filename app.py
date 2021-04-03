@@ -183,7 +183,7 @@ def get_full_graph():
     for p in part:
         mod_class = part[p]
         nd_degree = G.degree(p)
-        if (nd_degree > modularity[mod_class]['id_max_w']):
+        if (nd_degree >= modularity[mod_class]['id_max_w']):
             modularity[mod_class]['id_max_w'] = nd_degree
             modularity[mod_class]['name'] = G.nodes[p]['name']
 
@@ -213,7 +213,7 @@ def get_full_graph():
 
         # Log
         verbose=True)
-    positions = forceatlas2.forceatlas2_networkx_layout(G, pos=None, iterations=1000)
+    positions = forceatlas2.forceatlas2_networkx_layout(G, pos=None, iterations=100)
 
     for n in data['nodes']:
         n['x'] = positions[n['id']][0]
