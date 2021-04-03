@@ -1,0 +1,385 @@
+{% extends 'base.html' %}
+
+{% block custom_style %}
+<style>
+    html, body {
+      height: 100%;
+    }
+    #zoom .z {
+        width: 60px;
+        height: 60px;
+        background: #fff;
+        background-color: rgba(255,255,255,0.7);
+        width: 60px;
+        height: 60px;
+        cursor: pointer;
+        border: 1px solid #ccc;
+        float: left;
+        margin-right: 4px;
+        background-repeat: no-repeat;
+    }
+    #zoom .atlas-btn {        
+        background-color: rgba(255,255,255,0.7);
+        border: 1px solid #ccc;       
+    }
+    #loader {
+        height: 95%;
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        z-index: 1;
+        width: 120px;
+        height: 120px;
+        margin: -76px 0 0 -76px;
+        border: 16px solid #f3f3f3;
+        border-radius: 50%;
+        border-top: 16px solid #3498db;
+        -webkit-animation: spin 2s linear infinite;
+        animation: spin 2s linear infinite;
+    }
+    @-webkit-keyframes spin {
+        0% { -webkit-transform: rotate(0deg); }
+        100% { -webkit-transform: rotate(360deg); }
+    }
+
+    @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+
+    #control-pane {
+      top: 10px;
+      /*bottom: 10px;*/
+      right: 10px;
+      position: absolute;
+      width: 230px;
+      background-color: rgb(249, 247, 237);
+      box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+    }
+    #control-pane > div {
+      margin: 10px;
+      overflow-x: auto;
+    }
+    .line {
+      clear: both;
+      display: block;
+      width: 100%;
+      margin: 0;
+      padding: 12px 0 0 0;
+      border-bottom: 1px solid #aac789;
+      background: transparent;
+    }
+    h2, h3, h4 {
+      padding: 0;
+      font-variant: small-caps;
+      font-weight: 100;
+    }
+    h3 {
+        font-size: 1.5rem;
+    }
+    .green {
+      color: #437356;
+    }
+    h2.underline {
+      color: #437356;
+      background: #f4f0e4;
+      margin: 0;
+      border-radius: 2px;
+      padding: 8px 12px;
+    }
+    #dump {
+        display: none;
+    }
+    /*
+    .hidden {
+      display: none;
+      visibility: hidden;
+    }
+    */
+    input[type=range] {
+      width: 160px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+    <div class='row h-100'>
+        <div class="col-md-12">
+            <div id="loader" class="p-3"></div>
+            <div id='network-container' class="p-3" style="height: 95%;"></div>
+            <div id="control-pane">
+                <h2 class="underline">filters</h2>
+                <div>
+                  <h3>min degree <span id="min-degree-val">0</span></h3>
+                  0 <input id="min-degree" type="range" min="0" max="0" value="0"> <span id="max-degree-value">0</span><br>
+                </div>
+                <div>
+                  <h3>node category</h3>
+                  <select id="node-category">
+                    <option value="" selected>All categories</option>
+                  </select>
+                </div>
+                <span class="line"></span>
+                <div>
+                    <button type="button" class="btn btn-light" id="reset-btn">Reset filters</button>
+                    <button type="button" class="btn btn-light" id="export-btn">Export</button>
+                </div>
+                <div id="dump" class=""></div>
+            </div>
+            <div id="zoom" style="z-index: 999; position: fixed;left: 45%;bottom: 25px; margin:0 auto; padding:0;">
+                <div class="z" rel="in" style="background-image: url(/static/img/zoom/zoom_in.png); background-position: center;"></div> 
+                <div class="z" rel="out" style="background-image: url(/static/img/zoom/zoom_out.png); background-position: center;"></div> 
+                <div class="z" rel="center" style="background-image: url(/static/img/zoom/zoom_reset.png); background-position: center;"></div>
+                <div class='z' rel='atlas'><button type="button" class="btn btn-info h-100 w-100 atlas-btn" onclick="frcAtlas(this)"><i class="fa fa-globe fa-2x" style="color: black;"></i></button></div>
+            </div>
+        </div>
+    </div>
+{% endblock %}
+
+{% block custom_scripts %}
+<script src="/static/js/sigmajs/sigma.core.js"></script>
+<script src="/static/js/sigmajs/conrad.js"></script>
+<script src="/static/js/sigmajs/utils/sigma.utils.js"></script>
+<script src="/static/js/sigmajs/utils/sigma.polyfills.js"></script>
+<script src="/static/js/sigmajs/sigma.settings.js"></script>
+<script src="/static/js/sigmajs/classes/sigma.classes.dispatcher.js"></script>
+<script src="/static/js/sigmajs/classes/sigma.classes.configurable.js"></script>
+<script src="/static/js/sigmajs/classes/sigma.classes.graph.js"></script>
+<script src="/static/js/sigmajs/classes/sigma.classes.camera.js"></script>
+<script src="/static/js/sigmajs/classes/sigma.classes.quad.js"></script>
+<script src="/static/js/sigmajs/classes/sigma.classes.edgequad.js"></script>
+<script src="/static/js/sigmajs/captors/sigma.captors.mouse.js"></script>
+<script src="/static/js/sigmajs/captors/sigma.captors.touch.js"></script>
+<script src="/static/js/sigmajs/renderers/sigma.renderers.canvas.js"></script>
+<script src="/static/js/sigmajs/renderers/sigma.renderers.webgl.js"></script>
+<script src="/static/js/sigmajs/renderers/sigma.renderers.svg.js"></script>
+<script src="/static/js/sigmajs/renderers/sigma.renderers.def.js"></script>
+<script src="/static/js/sigmajs/renderers/webgl/sigma.webgl.nodes.def.js"></script>
+<script src="/static/js/sigmajs/renderers/webgl/sigma.webgl.nodes.fast.js"></script>
+<script src="/static/js/sigmajs/renderers/webgl/sigma.webgl.edges.def.js"></script>
+<script src="/static/js/sigmajs/renderers/webgl/sigma.webgl.edges.fast.js"></script>
+<script src="/static/js/sigmajs/renderers/webgl/sigma.webgl.edges.arrow.js"></script>
+<script src="/static/js/sigmajs/renderers/canvas/sigma.canvas.labels.def.js"></script>
+<script src="/static/js/sigmajs/renderers/canvas/sigma.canvas.hovers.def.js"></script>
+<script src="/static/js/sigmajs/renderers/canvas/sigma.canvas.nodes.def.js"></script>
+<script src="/static/js/sigmajs/renderers/canvas/sigma.canvas.edges.def.js"></script>
+<script src="/static/js/sigmajs/renderers/canvas/sigma.canvas.edges.curve.js"></script>
+<script src="/static/js/sigmajs/renderers/canvas/sigma.canvas.edges.arrow.js"></script>
+<script src="/static/js/sigmajs/renderers/canvas/sigma.canvas.edges.curvedArrow.js"></script>
+<script src="/static/js/sigmajs/renderers/canvas/sigma.canvas.edgehovers.def.js"></script>
+<script src="/static/js/sigmajs/renderers/canvas/sigma.canvas.edgehovers.curve.js"></script>
+<script src="/static/js/sigmajs/renderers/canvas/sigma.canvas.edgehovers.arrow.js"></script>
+<script src="/static/js/sigmajs/renderers/canvas/sigma.canvas.edgehovers.curvedArrow.js"></script>
+<script src="/static/js/sigmajs/renderers/canvas/sigma.canvas.extremities.def.js"></script>
+<script src="/static/js/sigmajs/renderers/svg/sigma.svg.utils.js"></script>
+<script src="/static/js/sigmajs/renderers/svg/sigma.svg.nodes.def.js"></script>
+<script src="/static/js/sigmajs/renderers/svg/sigma.svg.edges.def.js"></script>
+<script src="/static/js/sigmajs/renderers/svg/sigma.svg.edges.curve.js"></script>
+<script src="/static/js/sigmajs/renderers/svg/sigma.svg.labels.def.js"></script>
+<script src="/static/js/sigmajs/renderers/svg/sigma.svg.hovers.def.js"></script>
+<script src="/static/js/sigmajs/middlewares/sigma.middlewares.rescale.js"></script>
+<script src="/static/js/sigmajs/middlewares/sigma.middlewares.copy.js"></script>
+<script src="/static/js/sigmajs/misc/sigma.misc.animation.js"></script>
+<script src="/static/js/sigmajs/misc/sigma.misc.bindEvents.js"></script>
+<script src="/static/js/sigmajs/misc/sigma.misc.bindDOMEvents.js"></script>
+<script src="/static/js/sigmajs/misc/sigma.misc.drawHovers.js"></script>
+<!--Plugin-->
+<script src="/static/js/sigmajs/plugins/sigma.layout.forceAtlas2.min.js"></script>
+<script src="/static/js/sigmajs/plugins/sigma.layout.noverlap.js"></script>
+<script src="/static/js/sigmajs/plugins/sigma.parsers.json.min.js"></script>
+<script src="/static/js/sigmajs/plugins/sigma.plugins.animate.js"></script>
+<script src="/static/js/sigmajs/plugins/sigma.plugins.dragNodes.js"></script>
+<script src="/static/js/sigmajs/plugins/sigma.plugins.filter.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/sigma.js/1.2.1/plugins/sigma.renderers.edgeLabels.min.js" integrity="sha512-NdmXr+AEuaizDckUjMI05kDsdoXbj6Z0fDxqAqPfhecHITSzGWPA/zeE/ousxA4pVIALj0V6/JgfTGYT9aS7Jw==" crossorigin="anonymous"></script>
+
+<script type='text/javascript'>
+    mygraph = new sigma({ 
+        renderer: {
+          container: document.getElementById('network-container'),
+          type: 'canvas',
+        },
+        settings: {
+          doubleClickEnabled: false,
+          minEdgeSize: 0.5,
+          maxEdgeSize: 5,
+          singleHover: true, 
+        // not wrking settings
+
+        // wrking settings
+          drawLabels: false,
+          
+
+          mouseWheelEnabled: false,
+          // Edge
+          edgeColor: 'source',
+          enableEdgeHovering: true,
+          edgeHoverPrecision: 5,
+
+          // Edge Label
+          drawEdgeLabels: false, 
+          edgeLabelColor: 'default', 
+          defaultEdgeLabelColor: '#fff',
+          defaultEdgeLabelActiveColor: '#fff',
+          defaultEdgeLabelSize: 12, 
+          edgeLabelSize: 'fixed', 
+          edgeLabelAlignement: 'auto', 
+
+          defaultEdgeHoverLabelBGColor: '#002147',
+          enableLabelHoverBGColor: 'dafault',
+          enableLabelHoverShadow: 'default',
+          edgeLabelHoverShdowColor: '#000',
+          
+        }
+      });
+    var  filter = new sigma.plugins.filter(mygraph);
+    var url = '/artist/full/data.json'
+    sigma.parsers.json(url, mygraph, function() {
+        document.getElementById('loader').style.display = 'none';
+        mygraph.refresh();
+        updateControlPane(mygraph.graph, filter);
+
+        // event functions
+        function applyMinDegreeFilter(e) {
+            var v = e.target.value;
+            document.getElementById('min-degree-val').textContent = v;
+
+            filter
+            .undo('min-degree')
+            .nodesBy(function(n) {
+                return this.degree(n.id) >= v;
+            }, 'min-degree')
+            .apply();
+        }
+
+        function applyCategoryFilter(e) {
+            var c = e.target[e.target.selectedIndex].value;
+            console.log(typeof(c));
+            filter
+            .undo('node-category')
+            .nodesBy(function(n) {
+                return !c.length || n.attributes['Modularity Class'] === c;
+            }, 'node-category')
+            .apply();
+        }
+
+        // bind event to functions
+        document.getElementById('min-degree').addEventListener("input", applyMinDegreeFilter);  // for Chrome and FF
+        document.getElementById('min-degree').addEventListener("change", applyMinDegreeFilter); // for IE10+, that sucks
+        document.getElementById('node-category').addEventListener("change", applyCategoryFilter);
+    });
+</script>
+
+<!-- force atlas -->
+<script type="text/javascript">
+function frcAtlas(elem) {
+    if (mygraph.isForceAtlas2Running()) {
+        mygraph.stopForceAtlas2(); 
+        elem.children[0].className = 'fa fa-globe fa-2x'
+    } else {
+    mygraph.startForceAtlas2({
+        linLogMode: false,
+        outboundAttractionDistribution: true,
+        adjustSizes: true,
+        edgeWeightInfluence: 0,
+
+        scalingRatio: 2.0,
+        strongGravityMode: false,
+        gravity: 1,
+        barnesHutOptimize: true,
+        barnesHutTheta: 1.2,
+        slowDown: 1,
+        startingIterations: 1,
+        iterationsPerRender: 1,
+        worker: true
+        }); 
+    elem.children[0].className = 'fa fa-spinner fa-spin fa-2x'
+    }
+}
+</script>
+
+
+<!-- Zoom Buttons Control -->
+<script type="text/javascript">
+    $("#zoom").find("div.z").each(function () {
+        var a = $(this),
+            b = a.attr("rel"),
+            c = mygraph.camera;
+
+        a.click(function () {
+            switch (b) {
+                case 'center':
+                    // Zoom reset - animation :
+                    sigma.misc.animation.camera(c, {
+                        ratio: 1
+                    }, {
+                        duration: 200
+                    });
+                    break; 
+                case 'in':
+                    // Zoom in - animation :
+                    sigma.misc.animation.camera(c, {
+                        ratio: c.ratio / c.settings('zoomingRatio')
+                    }, {
+                        duration: 200
+                    });
+                    break;
+                case 'out':
+                    // Zoom out - animation :
+                    sigma.misc.animation.camera(c, {
+                    ratio: c.ratio * c.settings('zoomingRatio')
+                    }, {
+                    duration: 200
+                    });
+                    break;
+
+                default: break; 
+            }
+        })
+    });
+</script>
+
+<!-- Update control pane -->
+<script type="text/javascript">
+function updateControlPane (graph, filter) {
+    // get max degree
+    var maxDegree = 0,
+        categories = {};
+    
+    // read nodes
+    graph.nodes().forEach(function(n) {
+        maxDegree = Math.max(maxDegree, graph.degree(n.id));
+        categories[n.attributes['Modularity Class']] = true;
+    })
+
+  // min degree
+  document.getElementById('min-degree').max = maxDegree;
+  document.getElementById('max-degree-value').textContent = maxDegree;
+
+  // node category
+  var nodecategoryElt = document.getElementById('node-category');
+  Object.keys(categories).forEach(function(c) {
+    var optionElt = document.createElement("option");
+    optionElt.text = c;
+    nodecategoryElt.add(optionElt);
+  });
+
+    // reset button
+    document.getElementById('reset-btn').addEventListener("click", function(e) {
+        document.getElementById('min-degree').value = 0;
+        document.getElementById('min-degree-val').textContent = '0';
+        document.getElementById('node-category').selectedIndex = 0;
+        filter.undo().apply();
+        document.getElementById('dump').textContent = '';
+        document.getElementById('dump').display = 'none';
+  });
+
+  // export button - NOT WORKING
+  document.getElementById('export-btn').addEventListener("click", function(e) {
+    var chain = filter.export();
+    console.log(chain);
+    document.getElementById('dump').textContent = JSON.stringify(chain);
+    document.getElementById('dump') = 'block';
+});
+}
+</script>
+{% endblock %}
